@@ -35,8 +35,8 @@
   Student General Misconduct may arise regardless of whether or not I personally
   make use of such solutions or sought benefit from such actions.
 
-  Signed by: Artem Polyvyanyy
-  Dated:     14 September 2025
+  Signed by: Minh Hoang Ha
+  Dated:     28 September 2025
 */
 
 #include <stdio.h>
@@ -67,7 +67,7 @@ typedef struct {
 /* INTERFACE FUNCTIONS FOR WORKING WITH CSR MATRICES -------------------------*/
 CSRMatrix_t*  csr_matrix_create(int, int);        // create empty CSR matrix
 void          csr_matrix_free(CSRMatrix_t*);      // free input CSR matrix
-
+void          read_input(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B); 
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
 int main(void) {
     int stage=0, rows, cols;
@@ -75,12 +75,14 @@ int main(void) {
     assert(scanf(MTXDIM, &rows, &cols)==2);       // assert matrix dimensions
     CSRMatrix_t* A = csr_matrix_create(rows,cols);// create initial matrix of 0s
     CSRMatrix_t* B = csr_matrix_create(rows,cols);// create target matrix of 0s
-    // ...
+    read_input(rows, cols, A, B);
+      // ...
     printf(SDELIM, stage++);                      // print Stage 1 header
     printf(SDELIM, stage++);                      // print Stage 2 header
     printf(THEEND);                               // print "THE END" message
     csr_matrix_free(A);                           // free initial matrix
     csr_matrix_free(B);                           // free target matrix
+    printf("algorithms are fun");
     return EXIT_SUCCESS;                          // algorithms are fun!!!
 }
 
@@ -112,4 +114,19 @@ void csr_matrix_free(CSRMatrix_t *A) {
     free(A->cidx);      // free column indices
     free(A->rptr);      // free row pointers
     free(A);            // free matrix
+}
+
+// Read matrices input
+void read_input(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B) {
+    assert(A!=NULL && B!=NULL);
+    int row, col, value;
+    int i=0;
+    A->vals = (int*)malloc((size_t)(A->rows+1)*sizeof(int));
+    while(scanf("%d,%d,%d", &row, &col, &value)==3) {
+        A->vals[i] = value;
+        A->nnz++;
+        A->cidx = col;
+        A->rptr[col]++;
+    }
+    return;
 }
