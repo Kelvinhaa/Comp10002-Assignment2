@@ -47,7 +47,7 @@
 /* #DEFINE'S -----------------------------------------------------------------*/
 #define SDELIM "==STAGE %d============================\n"   // stage delimiter
 #define THEEND "==THE END============================\n"    // end message
-
+#define LINESEP "-------------------------------------\n"   // Line separation
 #define MTXDIM "%dx%d\n"                // matrix dimensions input format
 
 /* TYPE DEFINITIONS ----------------------------------------------------------*/
@@ -67,22 +67,24 @@ typedef struct {
 /* INTERFACE FUNCTIONS FOR WORKING WITH CSR MATRICES -------------------------*/
 CSRMatrix_t*  csr_matrix_create(int, int);        // create empty CSR matrix
 void          csr_matrix_free(CSRMatrix_t*);      // free input CSR matrix
-void          read_input(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B); 
+void          read_input(int rows, int cols, CSRMatrix_t* A); 
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
 int main(void) {
     int stage=0, rows, cols;
-    printf(SDELIM, stage++);                      // print Stage 0 header
     assert(scanf(MTXDIM, &rows, &cols)==2);       // assert matrix dimensions
     CSRMatrix_t* A = csr_matrix_create(rows,cols);// create initial matrix of 0s
     CSRMatrix_t* B = csr_matrix_create(rows,cols);// create target matrix of 0s
-    read_input(rows, cols, A, B);
-      // ...
+    read_input(rows, cols, A);
+    read_input(rows, cols, B);
+    printf(SDELIM, stage++);                      // print Stage 0 header
+    printf(LINESEP);
+    // ...
     printf(SDELIM, stage++);                      // print Stage 1 header
     printf(SDELIM, stage++);                      // print Stage 2 header
     printf(THEEND);                               // print "THE END" message
     csr_matrix_free(A);                           // free initial matrix
     csr_matrix_free(B);                           // free target matrix
-    printf("algorithms are fun");
+    printf("algorithms are fun\n");
     return EXIT_SUCCESS;                          // algorithms are fun!!!
 }
 
@@ -117,15 +119,18 @@ void csr_matrix_free(CSRMatrix_t *A) {
 }
 
 // Read matrices input
-void read_input(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B) {
-    assert(A!=NULL && B!=NULL);
+void read_input(int rows, int cols, CSRMatrix_t* A) {
+    assert(A!=NULL);
     int row, col, value;
     int i=0;
     A->vals = (int*)malloc((size_t)(A->rows+1)*sizeof(int));
+    assert(A->vals!=NULL);
+    A->cidx = (int*)malloc((size_t)(cols)*sizeof(int));
+    assert(A->cidx!=NULL);
     while(scanf("%d,%d,%d", &row, &col, &value)==3) {
         A->vals[i] = value;
         A->nnz++;
-        A->cidx = col;
+        A->cidx[i] = col;
         A->rptr[col]++;
     }
     return;
