@@ -67,15 +67,15 @@ typedef struct {
 /* INTERFACE FUNCTIONS FOR WORKING WITH CSR MATRICES -------------------------*/
 CSRMatrix_t*  csr_matrix_create(int, int);        // create empty CSR matrix
 void          csr_matrix_free(CSRMatrix_t*);      // free input CSR matrix
-void          read_input(int rows, int cols, CSRMatrix_t* A); 
+void          do_stage_0(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B); 
+void          read_input(CSRMatrix_t* A);
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
 int main(void) {
     int stage=0, rows, cols;
     assert(scanf(MTXDIM, &rows, &cols)==2);       // assert matrix dimensions
     CSRMatrix_t* A = csr_matrix_create(rows,cols);// create initial matrix of 0s
     CSRMatrix_t* B = csr_matrix_create(rows,cols);// create target matrix of 0s
-    read_input(rows, cols, A);
-    read_input(rows, cols, B);
+    do_stage_0(rows, cols, A, B);
     printf(SDELIM, stage++);                      // print Stage 0 header
     printf(LINESEP);
     // ...
@@ -119,19 +119,49 @@ void csr_matrix_free(CSRMatrix_t *A) {
 }
 
 // Read matrices input
-void read_input(int rows, int cols, CSRMatrix_t* A) {
+void do_stage_0(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B) {
     assert(A!=NULL);
-    int row, col, value;
-    int i=0;
-    A->vals = (int*)malloc((size_t)(A->rows+1)*sizeof(int));
+    // upper bound assuming top and bottom row is always 0
+    int max_size = (rows-2)*(cols);
+    A->vals = (int*)malloc(max_size*sizeof(int));
     assert(A->vals!=NULL);
-    A->cidx = (int*)malloc((size_t)(cols)*sizeof(int));
+    A->cidx = (int*)malloc(max_size*sizeof(int));
     assert(A->cidx!=NULL);
-    while(scanf("%d,%d,%d", &row, &col, &value)==3) {
-        A->vals[i] = value;
-        A->nnz++;
-        A->cidx[i] = col;
-        A->rptr[col]++;
-    }
+
+    B->vals = (int*)malloc(max_size*sizeof(int));
+    assert(B->vals!=NULL);
+    B->cidx = (int*)malloc(max_size*sizeof(int));
+    assert(B->cidx!=NULL);
+    read_input(A);
+    read_input(B);
+    
     return;
+}
+
+void read_input(CSRMatrix_t* A) {
+    assert(A!=NULL);
+    int row, col, value, c;
+    while (scanf("%d,%d,%d", &row, &col, &value) == 3) {
+        // Compute CSR Matrix 
+        A->cidx[A->nnz] = col;
+        A->rptr[row-1]++;
+        A->vals[A->nnz] = value;
+        A->nnz++;
+        // read one char right after the triplet
+        c = getchar();
+
+        if (c == '\n' || c == '\r' || c == ' ') {
+            // read ahead one more character
+            c = getchar();
+        }
+        // Break if next input is #
+        if (c == '#') {
+            break;
+        }
+        // otherwise push it back for scanf
+        ungetc(c, stdin);
+    }
+    for (int i = 1; i <= A->rows; i++) {
+        A->rptr[i] += A->rptr[i-1];
+    }
 }
