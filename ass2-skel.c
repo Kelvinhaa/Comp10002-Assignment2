@@ -1,10 +1,10 @@
 /* Program that transforms a given initial two-dimensional matrix into a target
   matrix by applying a sequence of matrix manipulations.
 
-  The program was written by Artem Polyvyanyy, http://polyvyanyy.com/, with the
-  intention to demonstrate to students an example solution to Assignment 2
-  of the Foundations of Algorithms (comp10002) subject (Semester 2, 2025).
-  All included code is (c) Copyright University of Melbourne, 2025.
+  Skeleton program written by Artem Polyvyanyy, http://polyvyanyy.com/, 
+  September 2025, with the intention that it be modified by students to add 
+  functionality, as required by the assignment specification. All included 
+  code is (c) Copyright University of Melbourne, 2025.
 
   Authorship Declaration:
 
@@ -67,17 +67,17 @@ typedef struct {
 /* INTERFACE FUNCTIONS FOR WORKING WITH CSR MATRICES -------------------------*/
 CSRMatrix_t*  csr_matrix_create(int, int);        // create empty CSR matrix
 void          csr_matrix_free(CSRMatrix_t*);      // free input CSR matrix
-void          do_stage_0(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B); 
-void          read_input(CSRMatrix_t* A);
+void do_stage_0(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B,int *stage); 
+void read_input(CSRMatrix_t* A, int rows);
+void print_matrix(CSRMatrix_t* A, int rows, int cols);
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
 int main(void) {
     int stage=0, rows, cols;
     assert(scanf(MTXDIM, &rows, &cols)==2);       // assert matrix dimensions
     CSRMatrix_t* A = csr_matrix_create(rows,cols);// create initial matrix of 0s
     CSRMatrix_t* B = csr_matrix_create(rows,cols);// create target matrix of 0s
-    do_stage_0(rows, cols, A, B);
-    printf(SDELIM, stage++);                      // print Stage 0 header
-    printf(LINESEP);
+    do_stage_0(rows, cols, A, B, &stage);               
+    
     // ...
     printf(SDELIM, stage++);                      // print Stage 1 header
     printf(SDELIM, stage++);                      // print Stage 2 header
@@ -118,11 +118,11 @@ void csr_matrix_free(CSRMatrix_t *A) {
     free(A);            // free matrix
 }
 
-// Read matrices input
-void do_stage_0(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B) {
+// Stage 0 required: 
+void do_stage_0(int rows, int cols, CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
     assert(A!=NULL);
-    // upper bound assuming top and bottom row is always 0
-    int max_size = (rows-2)*(cols);
+    // upper bound limit (realloc more efficient here?)
+    int max_size = (rows)*(cols);
     A->vals = (int*)malloc(max_size*sizeof(int));
     assert(A->vals!=NULL);
     A->cidx = (int*)malloc(max_size*sizeof(int));
@@ -132,19 +132,55 @@ void do_stage_0(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B) {
     assert(B->vals!=NULL);
     B->cidx = (int*)malloc(max_size*sizeof(int));
     assert(B->cidx!=NULL);
-    read_input(A);
-    read_input(B);
-    
+
+    read_input(A, rows);
+    read_input(B, rows);
+    printf("\n");
+    printf(SDELIM, (*stage)++);
+
+    printf("Initial matrix: %dx%d, nnz=%d\n", rows, cols, A->nnz);
+    print_matrix(A, rows, cols);
+    printf(LINESEP);
+    printf("Target matrix: %dx%d, nnz=%d\n", rows, cols, B->nnz);
+    print_matrix(B, rows, cols);
+
     return;
 }
 
-void read_input(CSRMatrix_t* A) {
+// Print out the matrix using CSR matrix way
+void print_matrix(CSRMatrix_t* A, int rows, int cols) {
+    for (int row = 0; row < rows; row++) {
+        printf("[");
+        // If end-start>0 then following row will have values
+        int start = A->rptr[row];
+        int end = A->rptr[row+1];
+        for (int col = 0; col < cols; col++) {
+            int found = 0;
+            // Since cidx not sorted for each rows so again iterate to find
+            // if col match that A->cidx[index] (prevent skipping values)
+            for (int index = start; index < end; index++) {
+                if (A->cidx[index] == col) {
+                    printf("%d", A->vals[index]);
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) {
+                printf(" ");   
+            }
+        }
+        printf("]\n");
+    }
+}
+
+// Reading input "r,s,v" format
+void read_input(CSRMatrix_t* A, int rows) {
     assert(A!=NULL);
     int row, col, value, c;
     while (scanf("%d,%d,%d", &row, &col, &value) == 3) {
         // Compute CSR Matrix 
         A->cidx[A->nnz] = col;
-        A->rptr[row-1]++;
+        A->rptr[row]++;
         A->vals[A->nnz] = value;
         A->nnz++;
         // read one char right after the triplet
@@ -161,7 +197,13 @@ void read_input(CSRMatrix_t* A) {
         // otherwise push it back for scanf
         ungetc(c, stdin);
     }
-    for (int i = 1; i <= A->rows; i++) {
-        A->rptr[i] += A->rptr[i-1];
+    // Add all the accumulation to get row pointer correct
+    
+    int accumulate = 0;
+    for (int i = 0; i <= rows; i++) {
+        int cnt = A->rptr[i];   
+        A->rptr[i] = accumulate;       // set start index for this row
+        accumulate += cnt;             // accumulate
     }
+    
 }
