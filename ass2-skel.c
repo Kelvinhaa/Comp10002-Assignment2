@@ -66,7 +66,7 @@ typedef struct {
 
 typedef struct {
     char type[MANIPULATION_CHAR];
-    int para1, para2, para3, para4;
+    int para1, para2, para3, para4; // 4 parameters (set 0 for unused para)
 } Manip_t;
 
 /* FUNCTION PROTOTYPES -------------------------------------------------------*/
@@ -76,6 +76,7 @@ void do_stage_1(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B,int *stage);
 CSRMatrix_t*  csr_matrix_create(int, int);        // create empty CSR matrix
 void          csr_matrix_free(CSRMatrix_t*);      // free input CSR matrix
 void read_input(CSRMatrix_t* A, int rows);
+Manip_t *read_manip(void);
 void print_matrix(CSRMatrix_t* A, int rows, int cols);
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
 int main(void) {
@@ -183,7 +184,7 @@ void print_matrix(CSRMatrix_t* A, int rows, int cols) {
 // Reading input "r,s,v" format
 void read_input(CSRMatrix_t* A, int rows) {
     assert(A!=NULL);
-    int row, col, value, c;
+    int row, col, value, ch;
     while (scanf("%d,%d,%d", &row, &col, &value) == 3) {
         // Compute CSR Matrix 
         A->cidx[A->nnz] = col;
@@ -191,18 +192,18 @@ void read_input(CSRMatrix_t* A, int rows) {
         A->vals[A->nnz] = value;
         A->nnz++;
         // read one char right after the triplet
-        c = getchar();
+        ch = getchar();
 
-        if (c == '\n' || c == '\r' || c == ' ') {
+        if (ch == '\n' || ch == '\r' || ch == ' ') {
             // read ahead one more character
-            c = getchar();
+            ch = getchar();
         }
         // Break if next input is #
-        if (c == '#') {
+        if (ch == '#') {
             break;
         }
         // otherwise push it back for scanf
-        ungetc(c, stdin);
+        ungetc(ch, stdin);
     }
     // Add all the accumulation to get row pointer correct
     
@@ -215,7 +216,25 @@ void read_input(CSRMatrix_t* A, int rows) {
     
 }
 
+// Reading manipulation instructions
+Manip_t *read_manip(void) {
+    Manip_t *manip[] = (Manip_t*)malloc(sizeof(*manip));
+    assert(manip!=NULL);
+
+    int ch = getchar(), count=1;
+    int i=0;
+    while (ch!=EOF) {
+        if (count > 1) {
+            Manip_t *manip[] = (Manip_t*)realloc((count+1)+sizeof(*manip));
+        }
+        if (ch=='s') {
+            scanf("%d,%d,%d", &manip[i]->para1, &manip[i]->para2,&manip[i]->para3);
+        }
+    }
+
+}
+
 //
-void do_stage_1(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B,int *stage) {
+void do_stage_1(int rows, int cols, CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
     
 }
