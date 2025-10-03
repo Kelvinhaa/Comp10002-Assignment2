@@ -49,6 +49,8 @@
 #define THEEND "==THE END============================\n"    // end message
 #define LINESEP "-------------------------------------\n"   // Line separation
 #define MTXDIM "%dx%d\n"                // matrix dimensions input format
+#define LIST_OUTPUT 35 // Output as list if rows or cols are larger than 35
+#define MANIPULATION_CHAR 2 // manipulation of type 1 char + '/0'
 
 /* TYPE DEFINITIONS ----------------------------------------------------------*/
 // Compressed Sparse Row (CSR) matrix representation
@@ -62,12 +64,17 @@ typedef struct {
     int* rptr;       // row pointers
 } CSRMatrix_t;
 
-/* FUNCTION PROTOTYPES -------------------------------------------------------*/
+typedef struct {
+    char type[MANIPULATION_CHAR];
+    int para1, para2, para3, para4;
+} Manip_t;
 
+/* FUNCTION PROTOTYPES -------------------------------------------------------*/
+void do_stage_0(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B,int *stage); 
+void do_stage_1(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B,int *stage);
 /* INTERFACE FUNCTIONS FOR WORKING WITH CSR MATRICES -------------------------*/
 CSRMatrix_t*  csr_matrix_create(int, int);        // create empty CSR matrix
 void          csr_matrix_free(CSRMatrix_t*);      // free input CSR matrix
-void do_stage_0(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B,int *stage); 
 void read_input(CSRMatrix_t* A, int rows);
 void print_matrix(CSRMatrix_t* A, int rows, int cols);
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
@@ -77,14 +84,14 @@ int main(void) {
     CSRMatrix_t* A = csr_matrix_create(rows,cols);// create initial matrix of 0s
     CSRMatrix_t* B = csr_matrix_create(rows,cols);// create target matrix of 0s
     do_stage_0(rows, cols, A, B, &stage);               
-    
+    do_stage_1(rows, cols, A, B, &stage);
     // ...
     printf(SDELIM, stage++);                      // print Stage 1 header
     printf(SDELIM, stage++);                      // print Stage 2 header
     printf(THEEND);                               // print "THE END" message
     csr_matrix_free(A);                           // free initial matrix
     csr_matrix_free(B);                           // free target matrix
-    printf("algorithms are fun\n");
+    
     return EXIT_SUCCESS;                          // algorithms are fun!!!
 }
 
@@ -205,5 +212,10 @@ void read_input(CSRMatrix_t* A, int rows) {
         A->rptr[i] = accumulate;       // set start index for this row
         accumulate += cnt;             // accumulate
     }
+    
+}
+
+//
+void do_stage_1(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B,int *stage) {
     
 }
