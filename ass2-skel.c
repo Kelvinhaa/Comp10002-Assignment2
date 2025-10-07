@@ -51,6 +51,7 @@
 #define MTXDIM "%dx%d\n"                // matrix dimensions input format
 #define LIST_OUTPUT 35 // Output as list if rows or cols are larger than 35
 #define MANIPULATION_CHAR 2 // manipulation of type 1 char + '/0'
+#define INITIAL_MAP 4 // Initial number of manipulations can hold (can realloc)
 
 /* TYPE DEFINITIONS ----------------------------------------------------------*/
 // Compressed Sparse Row (CSR) matrix representation
@@ -60,6 +61,7 @@ typedef struct {
     int  nnz;        // number of stored non-zeros values in this matrix
     int  cap;        // matrix capacity to hold non-zero values
     int* vals;       // non-zero values in this matrix
+    int* ridx;       // Row indices of non-zero values
     int* cidx;       // column indices of non-zero values, in row-major order
     int* rptr;       // row pointers
 } CSRMatrix_t;
@@ -67,11 +69,13 @@ typedef struct {
 typedef struct {
     char type[MANIPULATION_CHAR];
     int para1, para2, para3, para4; // 4 parameters (set 0 for unused para)
+    int num_map; // Number of manipulations
 } Manip_t;
 
 /* FUNCTION PROTOTYPES -------------------------------------------------------*/
-void do_stage_0(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B,int *stage); 
-void do_stage_1(int rows, int cols, CSRMatrix_t* A, CSRMatrix_t* B,int *stage);
+Manip_t *do_stage_0(int rows,int cols,
+    CSRMatrix_t* A, CSRMatrix_t* B,int *stage); 
+void do_stage_1(Manip_t* manip, CSRMatrix_t* A, CSRMatrix_t* B,int *stage);
 /* INTERFACE FUNCTIONS FOR WORKING WITH CSR MATRICES -------------------------*/
 CSRMatrix_t*  csr_matrix_create(int, int);        // create empty CSR matrix
 void          csr_matrix_free(CSRMatrix_t*);      // free input CSR matrix
@@ -84,8 +88,8 @@ int main(void) {
     assert(scanf(MTXDIM, &rows, &cols)==2);       // assert matrix dimensions
     CSRMatrix_t* A = csr_matrix_create(rows,cols);// create initial matrix of 0s
     CSRMatrix_t* B = csr_matrix_create(rows,cols);// create target matrix of 0s
-    do_stage_0(rows, cols, A, B, &stage);               
-    do_stage_1(rows, cols, A, B, &stage);
+    Manip_t *manip = do_stage_0(rows, cols, A, B, &stage);               
+    do_stage_1(manip, A, B, &stage);
     // ...
     printf(SDELIM, stage++);                      // print Stage 1 header
     printf(SDELIM, stage++);                      // print Stage 2 header
@@ -107,6 +111,7 @@ CSRMatrix_t *csr_matrix_create(int nrows, int ncols) {
     A->nnz  = 0;                // initialize with no non-zero values
     A->cap  = 0;                // initialize capacity to no non-zero values
     A->vals = NULL;             // no values to store...
+    A->ridx = NULL;             // so there is no need to store riw==ow indices
     A->cidx = NULL;             // so there is no need to store column indices
     // allocate array to store row pointers
     A->rptr = (int*)malloc((size_t)(A->rows+1)*sizeof(int));
@@ -120,6 +125,7 @@ CSRMatrix_t *csr_matrix_create(int nrows, int ncols) {
 // Free input CSR matrix A
 void csr_matrix_free(CSRMatrix_t *A) {
     assert(A!=NULL);
+    free(A->ridx);
     free(A->vals);      // free matrix values
     free(A->cidx);      // free column indices
     free(A->rptr);      // free row pointers
@@ -127,22 +133,25 @@ void csr_matrix_free(CSRMatrix_t *A) {
 }
 
 // Stage 0 required: 
-void do_stage_0(int rows, int cols, CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
+Manip_t* do_stage_0(int rows, int cols, CSRMatrix_t* A,
+    CSRMatrix_t* B,int *stage) {
     assert(A!=NULL);
     // upper bound limit (realloc more efficient here?)
     int max_size = (rows)*(cols);
     A->vals = (int*)malloc(max_size*sizeof(int));
-    assert(A->vals!=NULL);
+    A->ridx = (int*)malloc(max_size*sizeof(int));
     A->cidx = (int*)malloc(max_size*sizeof(int));
-    assert(A->cidx!=NULL);
+    assert(A->cidx!=NULL && A->ridx!=NULL && A->vals!=NULL);
 
     B->vals = (int*)malloc(max_size*sizeof(int));
-    assert(B->vals!=NULL);
+    B->ridx = (int*)malloc(max_size*sizeof(int));
     B->cidx = (int*)malloc(max_size*sizeof(int));
-    assert(B->cidx!=NULL);
+    assert(A->cidx!=NULL && A->ridx!=NULL && A->vals!=NULL);
 
     read_input(A, rows);
     read_input(B, rows);
+    Manip_t *manip = read_manip();
+
     printf("\n");
     printf(SDELIM, (*stage)++);
 
@@ -152,7 +161,7 @@ void do_stage_0(int rows, int cols, CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
     printf("Target matrix: %dx%d, nnz=%d\n", rows, cols, B->nnz);
     print_matrix(B, rows, cols);
 
-    return;
+    return manip;
 }
 
 // Print out the matrix using CSR matrix way
@@ -181,12 +190,14 @@ void print_matrix(CSRMatrix_t* A, int rows, int cols) {
     }
 }
 
-// Reading input "r,s,v" format
+// Reading input "r,s,v" format (Since input can be not in order for row)
+// Using temporary pointer to handle random input
 void read_input(CSRMatrix_t* A, int rows) {
     assert(A!=NULL);
     int row, col, value, ch;
     while (scanf("%d,%d,%d", &row, &col, &value) == 3) {
         // Compute CSR Matrix 
+        A->ridx[A->nnz] = row;
         A->cidx[A->nnz] = col;
         A->rptr[row]++;
         A->vals[A->nnz] = value;
@@ -195,10 +206,10 @@ void read_input(CSRMatrix_t* A, int rows) {
         ch = getchar();
 
         if (ch == '\n' || ch == '\r' || ch == ' ') {
-            // read ahead one more character
+            // read ahead one more character to see whether it's "#"
             ch = getchar();
         }
-        // Break if next input is #
+        
         if (ch == '#') {
             break;
         }
@@ -206,35 +217,77 @@ void read_input(CSRMatrix_t* A, int rows) {
         ungetc(ch, stdin);
     }
     // Add all the accumulation to get row pointer correct
-    
+    // It will store how many values in row i - 1 for position i
     int accumulate = 0;
     for (int i = 0; i <= rows; i++) {
-        int cnt = A->rptr[i];   
+        int cnt = A->rptr[i];          // Set entries row i has
         A->rptr[i] = accumulate;       // set start index for this row
         accumulate += cnt;             // accumulate
     }
+
+    // Scatter into correct row slices (stable across input order)
+    int *next = (int*)malloc(A->rows * sizeof(int));
+    assert(next != NULL);
+    for (int r = 0; r < A->rows; r++) { // r for row
+        next[r] = A->rptr[r];
+    }
     
+    // Use temporary hold to deal with non-order input like test1
+    int *tmp_cidx = (int*)malloc((size_t)A->nnz * sizeof(int));
+    int *tmp_vals = (int*)malloc((size_t)A->nnz * sizeof(int));
+    assert(tmp_cidx && tmp_vals);
+
+    // For each nonzero (row, col, value), find the next free position 
+    // for its row in the final matrix arrays and place it there
+    for (int i = 0; i < A->nnz; i++) {
+        int r = A->ridx[i];
+        int pos = next[r]++; // next available position 
+        tmp_cidx[pos] = A->cidx[i];
+        tmp_vals[pos] = A->vals[i];
+    }
+
+    free(next);
+    // Swap in row-grouped arrays (ordered)
+    free(A->cidx); A->cidx = tmp_cidx; // points to new array
+    free(A->vals); A->vals = tmp_vals; // points to new array
 }
 
 // Reading manipulation instructions
 Manip_t *read_manip(void) {
-    Manip_t *manip[] = (Manip_t*)malloc(sizeof(*manip));
+    int cur_size = INITIAL_MAP; // Ask about this??
+    Manip_t *manip = (Manip_t*)malloc(cur_size*sizeof((*manip)));
     assert(manip!=NULL);
+    manip->num_map = 0;
 
-    int ch = getchar(), count=1;
+    int ch;
     int i=0;
-    while (ch!=EOF) {
-        if (count > 1) {
-            Manip_t *manip[] = (Manip_t*)realloc((count+1)+sizeof(*manip));
+    while ((ch=getchar())!=EOF) {
+        if (manip->num_map == cur_size) {
+            cur_size *= 2;
+            manip = realloc(manip, cur_size*sizeof(*manip));
+            assert(manip!=NULL);
         }
         if (ch=='s') {
-            scanf("%d,%d,%d", &manip[i]->para1, &manip[i]->para2,&manip[i]->para3);
+            scanf(":%d,%d,%d",&manip[i].para1,&manip[i].para2,&manip[i].para3);
         }
+        if (ch=='S') {
+            scanf(":%d,%d,%d,%d", &manip[i].para1, 
+                &manip[i].para2, &manip[i].para3, &manip[i].para4);
+        }
+        if (ch=='m') {
+            scanf(":%d", &manip[i].para1);
+        }
+        if (ch=='a') {
+            scanf(":%d", &manip[i].para1);
+        }
+        manip->num_map++;
+        i++;
     }
+    return manip;
 
 }
 
 //
-void do_stage_1(int rows, int cols, CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
+void do_stage_1(Manip_t* manip, CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
     
 }
