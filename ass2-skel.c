@@ -32,8 +32,8 @@
   available via such a service, may be regarded as Student General Misconduct
   (interfering with the teaching activities of the University and/or inciting
   others to commit Academic Misconduct). I understand that an allegation of
-  Student General Misconduct may arise regardless of whether or not I personally
-  make use of such solutions or sought benefit from such actions.
+  Student General Misconduct may arise regardless of whether or not I 
+  personally make use of such solutions or sought benefit from such actions.
 
   Signed by: Minh Hoang Ha
   Dated:     28 September 2025
@@ -112,7 +112,7 @@ CSRMatrix_t *csr_matrix_create(int nrows, int ncols) {
     A->nnz  = 0;                // initialize with no non-zero values
     A->cap  = 0;                // initialize capacity to no non-zero values
     A->vals = NULL;             // no values to store...
-    A->ridx = NULL;             // so there is no need to store riw==ow indices
+    A->ridx = NULL;             // so there is no need to store row indices
     A->cidx = NULL;             // so there is no need to store column indices
     // allocate array to store row pointers
     A->rptr = (int*)malloc((size_t)(A->rows+1)*sizeof(int));
