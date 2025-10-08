@@ -51,7 +51,8 @@
 #define MTXDIM "%dx%d\n"                // matrix dimensions input format
 #define LIST_OUTPUT 35 // Output as list if rows or cols are larger than 35
 #define MANIPULATION_CHAR 2 // manipulation of type 1 char + '/0'
-#define INITIAL_MAP 4 // Initial number of manipulations can hold (can realloc)
+#define INITIAL_MAP 4 // Initial number of manipulations can hold
+#define INITIAL_ENTRIES 1000 // Initial number of entries can hold
 
 /* TYPE DEFINITIONS ----------------------------------------------------------*/
 // Compressed Sparse Row (CSR) matrix representation
@@ -137,15 +138,14 @@ Manip_t* do_stage_0(int rows, int cols, CSRMatrix_t* A,
     CSRMatrix_t* B,int *stage) {
     assert(A!=NULL);
     // upper bound limit (realloc more efficient here?)
-    int max_size = (rows)*(cols);
-    A->vals = (int*)malloc(max_size*sizeof(int));
-    A->ridx = (int*)malloc(max_size*sizeof(int));
-    A->cidx = (int*)malloc(max_size*sizeof(int));
+    A->vals = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
+    A->ridx = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
+    A->cidx = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
     assert(A->cidx!=NULL && A->ridx!=NULL && A->vals!=NULL);
 
-    B->vals = (int*)malloc(max_size*sizeof(int));
-    B->ridx = (int*)malloc(max_size*sizeof(int));
-    B->cidx = (int*)malloc(max_size*sizeof(int));
+    B->vals = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
+    B->ridx = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
+    B->cidx = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
     assert(A->cidx!=NULL && A->ridx!=NULL && A->vals!=NULL);
 
     read_input(A, rows);
@@ -164,44 +164,63 @@ Manip_t* do_stage_0(int rows, int cols, CSRMatrix_t* A,
     return manip;
 }
 
-// Print out the matrix using CSR matrix way
+// Print out the matrix using CSR matrix
 void print_matrix(CSRMatrix_t* A, int rows, int cols) {
-    for (int row = 0; row < rows; row++) {
-        printf("[");
-        // If end-start>0 then following row will have values
-        int start = A->rptr[row];
-        int end = A->rptr[row+1];
-        for (int col = 0; col < cols; col++) {
-            int found = 0;
-            // Since cidx not sorted for each rows so again iterate to find
-            // if col match that A->cidx[index] (prevent skipping values)
-            for (int index = start; index < end; index++) {
-                if (A->cidx[index] == col) {
-                    printf("%d", A->vals[index]);
-                    found = 1;
-                    break;
+    if (rows > LIST_OUTPUT || cols > LIST_OUTPUT) {
+        for (int row = 0; row < A->nnz; row++) {
+            printf("(%d,%d)=%d\n", A->ridx[row],A->cidx[row],A->vals[row]);
+        }
+    }
+    else {
+        for (int row = 0; row < rows; row++) {
+            printf("[");
+            // If end-start>0 then following row will have values
+            int start = A->rptr[row];
+            int end = A->rptr[row+1];
+            for (int col = 0; col < cols; col++) {
+                int found = 0;
+                // Since cidx not sorted for each rows so again iterate to find
+                // if col match that A->cidx[index] (prevent skipping values)
+                for (int index = start; index < end; index++) {
+                    if (A->cidx[index] == col) {
+                        printf("%d", A->vals[index]);
+                        found = 1;
+                        break;
+                    }
+                }
+                if (!found) {
+                    printf(" ");   
                 }
             }
-            if (!found) {
-                printf(" ");   
-            }
+            printf("]\n");
         }
-        printf("]\n");
     }
-}
+}   
 
 // Reading input "r,s,v" format (Since input can be not in order for row)
 // Using temporary pointer to handle random input
 void read_input(CSRMatrix_t* A, int rows) {
     assert(A!=NULL);
     int row, col, value, ch;
+    int cur_size = INITIAL_ENTRIES;
+    A->cap=1;
     while (scanf("%d,%d,%d", &row, &col, &value) == 3) {
+        if (A->cap == cur_size) {
+            A->ridx = realloc(A->ridx, A->cap * sizeof(int)); 
+            assert(A->ridx!=NULL); 
+            A->cidx = realloc(A->cidx, A->cap * sizeof(int)); 
+            assert(A->cidx!=NULL); 
+            A->vals = realloc(A->vals, A->cap * sizeof(int)); 
+            assert(A->vals!=NULL);
+            cur_size *= 2;
+        }
         // Compute CSR Matrix 
         A->ridx[A->nnz] = row;
         A->cidx[A->nnz] = col;
         A->rptr[row]++;
         A->vals[A->nnz] = value;
         A->nnz++;
+        A->cap++;
         // read one char right after the triplet
         ch = getchar();
 
@@ -254,7 +273,7 @@ void read_input(CSRMatrix_t* A, int rows) {
 
 // Reading manipulation instructions
 Manip_t *read_manip(void) {
-    int cur_size = INITIAL_MAP; // Ask about this??
+    int cur_size = INITIAL_MAP; 
     Manip_t *manip = (Manip_t*)malloc(cur_size*sizeof((*manip)));
     assert(manip!=NULL);
     manip->num_map = 0;
@@ -279,6 +298,18 @@ Manip_t *read_manip(void) {
         }
         if (ch=='a') {
             scanf(":%d", &manip[i].para1);
+        }
+        if (ch=='r') {
+
+        }
+        if (ch=='c') {
+
+        }
+        if (ch=='R') {
+
+        }
+        if (ch=='C') {
+
         }
         manip->num_map++;
         i++;
