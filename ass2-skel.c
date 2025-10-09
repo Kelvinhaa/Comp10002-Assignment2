@@ -136,7 +136,7 @@ void csr_matrix_free(CSRMatrix_t *A) {
 // Stage 0 required: 
 Manip_t* do_stage_0(int rows, int cols, CSRMatrix_t* A,
     CSRMatrix_t* B,int *stage) {
-    assert(A!=NULL);
+    assert(A!=NULL & B!=NULL);
     // upper bound limit (realloc more efficient here?)
     A->vals = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
     A->ridx = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
@@ -166,6 +166,7 @@ Manip_t* do_stage_0(int rows, int cols, CSRMatrix_t* A,
 
 // Print out the matrix using CSR matrix
 void print_matrix(CSRMatrix_t* A, int rows, int cols) {
+    assert(A!=NULL);
     if (rows > LIST_OUTPUT || cols > LIST_OUTPUT) {
         for (int row = 0; row < A->nnz; row++) {
             printf("(%d,%d)=%d\n", A->ridx[row],A->cidx[row],A->vals[row]);
@@ -289,11 +290,11 @@ Manip_t *read_manip(void) {
         if (ch=='s') {
             scanf(":%d,%d,%d",&manip[i].para1,&manip[i].para2,&manip[i].para3);
         }
-        if (ch=='S') {
+        else if (ch=='S') {
             scanf(":%d,%d,%d,%d", &manip[i].para1, 
                 &manip[i].para2, &manip[i].para3, &manip[i].para4);
         }
-        if (ch=='m') {
+        else if (ch=='m') {
             scanf(":%d", &manip[i].para1);
         }
         if (ch=='a') {
