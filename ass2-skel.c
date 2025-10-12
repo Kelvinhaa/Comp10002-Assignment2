@@ -83,6 +83,8 @@ void          csr_matrix_free(CSRMatrix_t*);      // free input CSR matrix
 void read_input(CSRMatrix_t* A, int rows);
 Manip_t *read_manip(void);
 void print_matrix(CSRMatrix_t* A, int rows, int cols);
+// Check if initial matrix match target
+void match(CSRMatrix_t* A, CSRMatrix_t* B); 
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
 int main(void) {
     int stage=0, rows, cols;
@@ -90,9 +92,9 @@ int main(void) {
     CSRMatrix_t* A = csr_matrix_create(rows,cols);// create initial matrix of 0s
     CSRMatrix_t* B = csr_matrix_create(rows,cols);// create target matrix of 0s
     Manip_t *manip = do_stage_0(rows, cols, A, B, &stage);               
-    do_stage_1(manip, A, B, &stage);
     // ...
     printf(SDELIM, stage++);                      // print Stage 1 header
+    do_stage_1(manip, A, B, &stage);
     printf(SDELIM, stage++);                      // print Stage 2 header
     printf(THEEND);                               // print "THE END" message
     csr_matrix_free(A);                           // free initial matrix
@@ -253,8 +255,8 @@ void read_input(CSRMatrix_t* A, int rows) {
     }
     
     // Use temporary hold to deal with non-order input like test1
-    int *tmp_cidx = (int*)malloc((size_t)A->nnz * sizeof(int));
-    int *tmp_vals = (int*)malloc((size_t)A->nnz * sizeof(int));
+    int *tmp_cidx = (int*)malloc(A->nnz * sizeof(int));
+    int *tmp_vals = (int*)malloc(A->nnz * sizeof(int));
     assert(tmp_cidx && tmp_vals);
 
     // For each nonzero (row, col, value), find the next free position 
@@ -294,32 +296,42 @@ Manip_t *read_manip(void) {
             scanf(":%d,%d,%d,%d", &manip[i].para1, 
                 &manip[i].para2, &manip[i].para3, &manip[i].para4);
         }
-        else if (ch=='m') {
+        else if (ch=='m' || ch=='a') {
             scanf(":%d", &manip[i].para1);
         }
-        if (ch=='a') {
-            scanf(":%d", &manip[i].para1);
+        else if (ch=='r' || ch=='c' || ch=='R' || ch=='C') {
+            
+            scanf(":%d,%d", &manip[i].para1, &manip[i].para2);
         }
-        if (ch=='r') {
-
-        }
-        if (ch=='c') {
-
-        }
-        if (ch=='R') {
-
-        }
-        if (ch=='C') {
-
-        }
+        manip[i].type[0] = ch;
+        manip[i].type[1] = '\0';
         manip->num_map++;
         i++;
+        // Consume all "\n" (end of line)
+        int c;
+        while ((c = getchar()) != '\n' && c != EOF);
     }
     return manip;
 
 }
+// Check if two matrix are the same
+void match(CSRMatrix_t* A, CSRMatrix_t* B) {
 
-//
-void do_stage_1(Manip_t* manip, CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
-    
+}
+// Perform basic matrix manipulations
+void do_stage_1(Manip_t* manip,CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
+    // Apply all manipulations type until initial match target
+    for (int i=0;i < manip->num_map;i++) {
+        if (strcmp(manip[i].type, "s") == 0) {
+            printf("INSTRUCTION %c:%d,%d,%d", &manip[i].type, 
+                manip[i].para1, manip[i].para2, manip[i].para3);
+        }
+        else if (strcmp(manip[i].type, "S") == 0) {
+
+        }
+        else if (strcmp(manip[i].type, "m") == 0) {
+
+        }
+    }
+        
 }
