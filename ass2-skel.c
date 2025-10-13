@@ -82,9 +82,9 @@ CSRMatrix_t*  csr_matrix_create(int, int);        // create empty CSR matrix
 void          csr_matrix_free(CSRMatrix_t*);      // free input CSR matrix
 void read_input(CSRMatrix_t* A, int rows);
 Manip_t *read_manip(void);
-void print_matrix(CSRMatrix_t* A, int rows, int cols);
+void print_matrix(CSRMatrix_t* A);
 // Check if initial matrix match target
-void match(CSRMatrix_t* A, CSRMatrix_t* B); 
+int match(CSRMatrix_t* A, CSRMatrix_t* B); 
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
 int main(void) {
     int stage=0, rows, cols;
@@ -158,29 +158,29 @@ Manip_t* do_stage_0(int rows, int cols, CSRMatrix_t* A,
     printf(SDELIM, (*stage)++);
 
     printf("Initial matrix: %dx%d, nnz=%d\n", rows, cols, A->nnz);
-    print_matrix(A, rows, cols);
+    print_matrix(A);
     printf(LINESEP);
     printf("Target matrix: %dx%d, nnz=%d\n", rows, cols, B->nnz);
-    print_matrix(B, rows, cols);
+    print_matrix(B);
 
     return manip;
 }
 
 // Print out the matrix using CSR matrix
-void print_matrix(CSRMatrix_t* A, int rows, int cols) {
+void print_matrix(CSRMatrix_t* A) {
     assert(A!=NULL);
-    if (rows > LIST_OUTPUT || cols > LIST_OUTPUT) {
+    if (A->rows > LIST_OUTPUT || A->cols > LIST_OUTPUT) {
         for (int row = 0; row < A->nnz; row++) {
             printf("(%d,%d)=%d\n", A->ridx[row],A->cidx[row],A->vals[row]);
         }
     }
     else {
-        for (int row = 0; row < rows; row++) {
+        for (int row = 0; row < A->rows; row++) {
             printf("[");
             // If end-start>0 then following row will have values
             int start = A->rptr[row];
             int end = A->rptr[row+1];
-            for (int col = 0; col < cols; col++) {
+            for (int col = 0; col < A->cols; col++) {
                 int found = 0;
                 // Since cidx not sorted for each rows so again iterate to find
                 // if col match that A->cidx[index] (prevent skipping values)
@@ -239,7 +239,7 @@ void read_input(CSRMatrix_t* A, int rows) {
         ungetc(ch, stdin);
     }
     // Add all the accumulation to get row pointer correct
-    // It will store how many values in row i - 1 for position i
+    // It will store how many values in row 0 to i - 1 for position i
     int accumulate = 0;
     for (int i = 0; i <= rows; i++) {
         int cnt = A->rptr[i];          // Set entries row i has
@@ -281,14 +281,15 @@ Manip_t *read_manip(void) {
     assert(manip!=NULL);
     manip->num_map = 0;
 
-    int ch;
+    char ch;
     int i=0;
-    while ((ch=getchar())!=EOF) {
+    while (scanf(" %c", &ch) == 1) {
         if (manip->num_map == cur_size) {
             cur_size *= 2;
             manip = realloc(manip, cur_size*sizeof(*manip));
             assert(manip!=NULL);
         }
+        
         if (ch=='s') {
             scanf(":%d,%d,%d",&manip[i].para1,&manip[i].para2,&manip[i].para3);
         }
@@ -307,24 +308,59 @@ Manip_t *read_manip(void) {
         manip[i].type[1] = '\0';
         manip->num_map++;
         i++;
-        // Consume all "\n" (end of line)
-        int c;
-        while ((c = getchar()) != '\n' && c != EOF);
+        
     }
     return manip;
 
 }
-// Check if two matrix are the same
-void match(CSRMatrix_t* A, CSRMatrix_t* B) {
+// Check if initial matrix match target matrix
+int match(CSRMatrix_t *A, CSRMatrix_t *B) {
+    // Check number of non-zero elements
+    if (A->nnz != B->nnz) {
+        return 0;  
+    }
+
+    // Check row pointers
+    for (int i = 0; i <= A->rows; i++) {
+        if (A->rptr[i] != B->rptr[i]) {
+            return 0;   
+        }
+    }
+
+    // Check column indices and values
+    for (int i = 0; i < A->nnz; i++) {
+        if (A->cidx[i] != B->cidx[i]) return 0;
+        if (A->vals[i] != B->vals[i]) return 0;
+    }
+
+    return 1;  // all checks passed mean matrices are the same
+}
+
+void shift_right(int arr, int n) {
 
 }
 // Perform basic matrix manipulations
 void do_stage_1(Manip_t* manip,CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
     // Apply all manipulations type until initial match target
+    int row, col, val;
+    // int row1, row2, col1, col2;
     for (int i=0;i < manip->num_map;i++) {
         if (strcmp(manip[i].type, "s") == 0) {
-            printf("INSTRUCTION %c:%d,%d,%d", &manip[i].type, 
-                manip[i].para1, manip[i].para2, manip[i].para3);
+            row = manip[i].para1;
+            col = manip[i].para2;
+            val = manip[i].para3;
+            printf("INSTRUCTION %s:%d,%d,%d\n", manip[i].type, row, col, val);
+            // Slice of number of values in that row
+            int slice = A->rptr[row-1] + A->rptr[row];
+            for (int i=A->rptr[row-1];i<slice;i++) {
+                if (A->cidx[i] == col) {
+                    A->vals[i] = val;
+                }
+            }
+            printf("Current Matrix: %dx%d, nnz=%d\n", A->rows,A->cols,A->nnz);
+            print_matrix(A);
+            printf("Current Matrix: %dx%d, nnz=%d\n", B->rows,B->cols,B->nnz);
+            print_matrix(B);
         }
         else if (strcmp(manip[i].type, "S") == 0) {
 
