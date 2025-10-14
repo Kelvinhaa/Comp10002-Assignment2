@@ -85,6 +85,7 @@ Manip_t *read_manip(void);
 void print_matrix(CSRMatrix_t* A);
 // Check if initial matrix match target
 int match(CSRMatrix_t* A, CSRMatrix_t* B); 
+void shift_arr(CSRMatrix_t* A, int pos, int direction);
 /* WHERE IT ALL HAPPENS ------------------------------------------------------*/
 int main(void) {
     int stage=0, rows, cols;
@@ -209,13 +210,14 @@ void read_input(CSRMatrix_t* A, int rows) {
     A->cap=1;
     while (scanf("%d,%d,%d", &row, &col, &value) == 3) {
         if (A->cap == cur_size) {
-            A->ridx = realloc(A->ridx, A->cap * sizeof(int)); 
-            assert(A->ridx!=NULL); 
-            A->cidx = realloc(A->cidx, A->cap * sizeof(int)); 
-            assert(A->cidx!=NULL); 
-            A->vals = realloc(A->vals, A->cap * sizeof(int)); 
-            assert(A->vals!=NULL);
             cur_size *= 2;
+            A->ridx = realloc(A->ridx, cur_size * sizeof(int)); 
+            assert(A->ridx!=NULL); 
+            A->cidx = realloc(A->cidx, cur_size * sizeof(int)); 
+            assert(A->cidx!=NULL); 
+            A->vals = realloc(A->vals, cur_size * sizeof(int)); 
+            assert(A->vals!=NULL);
+            
         }
         // Compute CSR Matrix 
         A->ridx[A->nnz] = row;
@@ -238,6 +240,7 @@ void read_input(CSRMatrix_t* A, int rows) {
         // otherwise push it back for scanf
         ungetc(ch, stdin);
     }
+    A->cap = cur_size;
     // Add all the accumulation to get row pointer correct
     // It will store how many values in row 0 to i - 1 for position i
     int accumulate = 0;
@@ -336,8 +339,29 @@ int match(CSRMatrix_t *A, CSRMatrix_t *B) {
     return 1;  // all checks passed mean matrices are the same
 }
 
-void shift_right(int arr, int n) {
-
+void shift_arr(CSRMatrix_t* A, int pos, int direction) {
+    // Check if size of array need to be realloc
+    if (direction && A->nnz >= A->cap) {
+        A->cap *= 2;
+        A->cidx = realloc(A->cidx, A->cap * sizeof(int)); 
+        assert(A->cidx!=NULL); 
+        A->vals = realloc(A->vals, A->cap * sizeof(int)); 
+        assert(A->vals!=NULL);
+    }
+    if (direction) {
+        // Shift elements in array to the right
+        for (int i = A->nnz; i > pos; i--) {
+            A->cidx[i] = A->cidx[i - 1];
+            A->vals[i] = A->vals[i - 1];
+        }  
+    }else {
+        // Shift left
+        for (int i = pos; i < A->nnz - 1; i++) {
+            A->cidx[i] = A->cidx[i+1];
+            A->vals[i] = A->vals[i+1];
+        }  
+    }
+     
 }
 // Perform basic matrix manipulations
 void do_stage_1(Manip_t* manip,CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
@@ -351,10 +375,41 @@ void do_stage_1(Manip_t* manip,CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
             val = manip[i].para3;
             printf("INSTRUCTION %s:%d,%d,%d\n", manip[i].type, row, col, val);
             // Slice of number of values in that row
-            int slice = A->rptr[row-1] + A->rptr[row];
-            for (int i=A->rptr[row-1];i<slice;i++) {
-                if (A->cidx[i] == col) {
-                    A->vals[i] = val;
+            int start = A->rptr[row];
+            int end = A->rptr[row+1];  
+            int found = 0;
+            for (int j = start; j < end; j++) {
+                if (A->cidx[j] == col) {
+                    if (val == 0) {
+                        shift_arr(A, j, 0);
+                        for (int i = j+1; i < A->rows; i++) {
+                            A->rptr[i]--;
+                        }
+                        A->nnz--;
+                    }
+                    else {
+                        A->vals[j] = val; // update existing value
+                    }
+                    found = 1;
+                    break;
+                }
+            }
+
+            // Insert new value if not found
+            if (!found && val != 0) {
+                // find where to insert to keep columns sorted
+                int pos = start;
+                while (pos < end && A->cidx[pos] < col) pos++;
+                
+                // shift to make room
+                shift_arr(A, pos, 1);
+                // insert new element
+                A->cidx[pos] = col;
+                A->vals[pos] = val;
+                A->nnz++;
+                // update row pointers
+                for (int i = row+1; i < A->rows; i++) {
+                    A->rptr[i]++;
                 }
             }
             printf("Current Matrix: %dx%d, nnz=%d\n", A->rows,A->cols,A->nnz);
@@ -369,5 +424,5 @@ void do_stage_1(Manip_t* manip,CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
 
         }
     }
-        
+    
 }
