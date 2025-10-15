@@ -76,7 +76,9 @@ typedef struct {
 /* FUNCTION PROTOTYPES -------------------------------------------------------*/
 Manip_t *do_stage_0(int rows,int cols,
     CSRMatrix_t* A, CSRMatrix_t* B,int *stage); 
-void do_stage_1(Manip_t* manip, CSRMatrix_t* A, CSRMatrix_t* B,int *stage);
+int do_stage_1(Manip_t* manip, CSRMatrix_t* A, CSRMatrix_t* B,int *stage);
+void do_stage_2(Manip_t* manip, CSRMatrix_t* A, CSRMatrix_t* B, int start_idx, int *stage);
+void apply_manipulation(char* type, int para1, int para2, int para3, int para4, CSRMatrix_t* A);
 /* INTERFACE FUNCTIONS FOR WORKING WITH CSR MATRICES -------------------------*/
 CSRMatrix_t*  csr_matrix_create(int, int);        // create empty CSR matrix
 void          csr_matrix_free(CSRMatrix_t*);      // free input CSR matrix
@@ -93,14 +95,18 @@ int main(void) {
     CSRMatrix_t* A = csr_matrix_create(rows,cols);// create initial matrix of 0s
     CSRMatrix_t* B = csr_matrix_create(rows,cols);// create target matrix of 0s
     Manip_t *manip = do_stage_0(rows, cols, A, B, &stage);               
-    // ...
+    
     printf(SDELIM, stage++);                      // print Stage 1 header
-    do_stage_1(manip, A, B, &stage);
-    printf(SDELIM, stage++);                      // print Stage 2 header
+    int next_stage = do_stage_1(manip, A, B, &stage);
+    // If encounter stage 2 manipulation type, proceed with stage 2
+    if (next_stage < manip->num_map) {  
+        printf(SDELIM, stage++);                  // print Stage 2 header
+        do_stage_2(manip, A, B, next_stage, &stage);
+    }
     printf(THEEND);                               // print "THE END" message
     csr_matrix_free(A);                           // free initial matrix
     csr_matrix_free(B);                           // free target matrix
-    
+    free(manip);                                  // free manipulations array
     return EXIT_SUCCESS;                          // algorithms are fun!!!
 }
 
@@ -149,7 +155,7 @@ Manip_t* do_stage_0(int rows, int cols, CSRMatrix_t* A,
     B->vals = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
     B->ridx = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
     B->cidx = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
-    assert(A->cidx!=NULL && A->ridx!=NULL && A->vals!=NULL);
+    assert(B->cidx!=NULL && B->ridx!=NULL && B->vals!=NULL);
 
     read_input(A, rows);
     read_input(B, rows);
@@ -217,7 +223,6 @@ void read_input(CSRMatrix_t* A, int rows) {
             assert(A->cidx!=NULL); 
             A->vals = realloc(A->vals, cur_size * sizeof(int)); 
             assert(A->vals!=NULL);
-            
         }
         // Compute CSR Matrix 
         A->ridx[A->nnz] = row;
@@ -338,7 +343,7 @@ int match(CSRMatrix_t *A, CSRMatrix_t *B) {
 
     return 1;  // all checks passed mean matrices are the same
 }
-
+// Shift the array either to left or right
 void shift_arr(CSRMatrix_t* A, int pos, int direction) {
     // Check if size of array need to be realloc
     if (direction && A->nnz >= A->cap) {
@@ -361,68 +366,135 @@ void shift_arr(CSRMatrix_t* A, int pos, int direction) {
             A->vals[i] = A->vals[i+1];
         }  
     }
-     
 }
 // Perform basic matrix manipulations
-void do_stage_1(Manip_t* manip,CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
+int do_stage_1(Manip_t* manip,CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
     // Apply all manipulations type until initial match target
-    int row, col, val;
-    // int row1, row2, col1, col2;
     for (int i=0;i < manip->num_map;i++) {
-        if (strcmp(manip[i].type, "s") == 0) {
-            row = manip[i].para1;
-            col = manip[i].para2;
-            val = manip[i].para3;
-            printf("INSTRUCTION %s:%d,%d,%d\n", manip[i].type, row, col, val);
-            // Slice of number of non-zero values in that row
-            int start = A->rptr[row];
-            int end = A->rptr[row+1];  
-            int found = 0;
-            for (int j = start; j < end; j++) {
-                if (A->cidx[j] == col) {
-                    if (val == 0) {
-                        shift_arr(A, j, 0);
-                        for (int i = row; i < A->rows; i++) {
-                            A->rptr[i]--;
-                        }
-                        A->nnz--;
-                    }
-                    else {
-                        A->vals[j] = val; // update existing value
-                    }
-                    found = 1;
-                    break;
-                }
-            }
-
-            // Insert new value if not found
-            if (!found && val != 0) {
-                // find where to insert to keep columns sorted
-                int pos = start;
-                while (pos < end && A->cidx[pos] < col) pos++;
-                
-                // shift to make room
-                shift_arr(A, pos, 1);
-                // insert new element
-                A->cidx[pos] = col;
-                A->vals[pos] = val;
-                A->nnz++;
-                // update row pointers
-                for (int i = row+1; i < A->rows; i++) {
-                    A->rptr[i]++;
-                }
-            }
+        if (strcmp(manip[i].type, "s") == 0 || strcmp(manip[i].type, "S") == 0 || 
+            strcmp(manip[i].type, "m") == 0 || strcmp(manip[i].type, "a") == 0) {
+            
+            apply_manipulation(manip[i].type, manip[i].para1, manip[i].para2, 
+                             manip[i].para3, manip[i].para4, A);
+            // printf("%s\n", manip[i].type);
             printf("Current Matrix: %dx%d, nnz=%d\n", A->rows,A->cols,A->nnz);
             print_matrix(A);
             printf("Target Matrix: %dx%d, nnz=%d\n", B->rows,B->cols,B->nnz);
             print_matrix(B);
         }
-        else if (strcmp(manip[i].type, "S") == 0) {
-
+        else {
+            return i;
         }
-        else if (strcmp(manip[i].type, "m") == 0) {
-
+        
+        // Check if matrices match after this operation
+        if (match(A, B)) {
+            printf(LINESEP);
+            printf("TA-DAA!!! SOLVED IN %d STEP(S)!\n", i+1);
+            return manip->num_map; 
         }
     }
-    
+    // All Stage 1 instructions processed
+    return manip->num_map; 
+}
+
+// Apply a single manipulation to matrix A
+void apply_manipulation(char* type, int para1, int para2, 
+    int para3, int para4, CSRMatrix_t* A) {
+    if (strcmp(type, "s") == 0) {
+        int row = para1, col = para2, val = para3;
+        printf("INSTRUCTION %s:%d,%d,%d\n", type, row, col, val);
+        // Slice of number of non-zero values in that row
+        int start = A->rptr[row];
+        int end = A->rptr[row+1];  
+        int found = 0;
+        // If there is already a value existing then update that value
+        for (int j = start; j < end; j++) {
+            if (A->cidx[j] == col) {
+                if (val == 0) {
+                    shift_arr(A, j, 0);
+                    for (int i = row+1; i <= A->rows; i++) {
+                        A->rptr[i]--;
+                    }
+                    A->nnz--;
+                }
+                else {
+                    A->vals[j] = val; // update existing value
+                }
+                found = 1;
+                break;
+            }
+        }
+        // Insert new value if not found
+        if (!found && val != 0) {
+            // find where to insert to keep columns sorted
+            int pos = start;
+            while (pos < end && A->cidx[pos] < col) pos++;
+            
+            // shift to make room
+            shift_arr(A, pos, 1);
+            // insert new element
+            A->cidx[pos] = col;
+            A->vals[pos] = val;
+            A->nnz++;
+            // update row pointers
+            for (int i = row+1; i < A->rows; i++) {
+                A->rptr[i]++;
+            }
+        }
+    }
+    else if (strcmp(type, "S") == 0) {
+        printf("INSTRUCTION %s:%d,%d,%d,%d\n",type,para1,para2,para3,para4);
+        // Swap values for 2 cells
+    }
+    else if (strcmp(type, "m") == 0) {
+        printf("INSTRUCTION %s:%d\n", type, para1);
+        // multiply all values by para1
+        for (int i = 0; i < A->nnz; i++) {
+            A->vals[i] *= para1;
+        }
+    }
+    else if (strcmp(type, "a") == 0) {
+        printf("INSTRUCTION %s:%d\n", type, para1);
+        // add para1 to all values
+        for (int i = 0; i < A->nnz; i++) {
+            A->vals[i] += para1;
+        }
+    }
+    else if (strcmp(type, "r") == 0) {
+        printf("INSTRUCTION %s:%d,%d\n", type, para1, para2);
+        // swap rows
+    }
+    else if (strcmp(type, "c") == 0) {
+        printf("INSTRUCTION %s:%d,%d\n", type, para1, para2);
+        // swap columns
+    }
+    else if (strcmp(type, "R") == 0) {
+        printf("INSTRUCTION %s:%d,%d\n", type, para1, para2);
+        // copy row
+    }
+    else if (strcmp(type, "C") == 0) {
+        printf("INSTRUCTION %s:%d,%d\n", type, para1, para2);
+        // copy column
+    }
+}
+// Stage 2: Supported matrix manipulations
+void do_stage_2(Manip_t* manip, CSRMatrix_t* A, CSRMatrix_t* B, 
+    int start_idx, int *stage) {
+    for (int i = start_idx; i < manip->num_map; i++) {
+        printf("%d\n", A->nnz);
+        apply_manipulation(manip[i].type, manip[i].para1, manip[i].para2, 
+                         manip[i].para3, manip[i].para4, A);
+        
+        printf("Current Matrix: %dx%d, nnz=%d\n", A->rows, A->cols, A->nnz);
+        print_matrix(A);
+        printf("Target Matrix: %dx%d, nnz=%d\n", B->rows, B->cols, B->nnz);
+        print_matrix(B);
+        
+        // Check if matrices match after this operation
+        if (match(A, B)) {
+            printf(LINESEP);
+            printf("TA-DAA!!! SOLVED IN %d STEP(S)!\n", i+1);
+            return;
+        }
+    }
 }
