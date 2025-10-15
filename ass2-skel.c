@@ -26,7 +26,7 @@
   to other students, regardless of my intention or any undertakings made to me
   by that other student, is also Academic Misconduct.
 
-  (3) I further understand that providing a copy of the assignment specification
+  (3)I further understand that providing a copy of the assignment specification
   to any form of code authoring or assignment tutoring service, or drawing the
   attention of others to such services and code that may have been made
   available via such a service, may be regarded as Student General Misconduct
@@ -374,7 +374,7 @@ void do_stage_1(Manip_t* manip,CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
             col = manip[i].para2;
             val = manip[i].para3;
             printf("INSTRUCTION %s:%d,%d,%d\n", manip[i].type, row, col, val);
-            // Slice of number of values in that row
+            // Slice of number of non-zero values in that row
             int start = A->rptr[row];
             int end = A->rptr[row+1];  
             int found = 0;
@@ -382,7 +382,7 @@ void do_stage_1(Manip_t* manip,CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
                 if (A->cidx[j] == col) {
                     if (val == 0) {
                         shift_arr(A, j, 0);
-                        for (int i = j+1; i < A->rows; i++) {
+                        for (int i = row; i < A->rows; i++) {
                             A->rptr[i]--;
                         }
                         A->nnz--;
@@ -414,7 +414,7 @@ void do_stage_1(Manip_t* manip,CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
             }
             printf("Current Matrix: %dx%d, nnz=%d\n", A->rows,A->cols,A->nnz);
             print_matrix(A);
-            printf("Current Matrix: %dx%d, nnz=%d\n", B->rows,B->cols,B->nnz);
+            printf("Target Matrix: %dx%d, nnz=%d\n", B->rows,B->cols,B->nnz);
             print_matrix(B);
         }
         else if (strcmp(manip[i].type, "S") == 0) {
