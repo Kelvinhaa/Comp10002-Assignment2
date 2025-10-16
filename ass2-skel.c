@@ -78,6 +78,7 @@ Manip_t *do_stage_0(int rows,int cols,
     CSRMatrix_t* A, CSRMatrix_t* B,int *stage); 
 int do_stage_1(Manip_t* manip, CSRMatrix_t* A, CSRMatrix_t* B,int *stage);
 void do_stage_2(Manip_t* manip, CSRMatrix_t* A, CSRMatrix_t* B, int start_idx, int *stage);
+int swap(int *a, int *b);
 void apply_manipulation(char* type, int para1, int para2, int para3, int para4, CSRMatrix_t* A);
 /* INTERFACE FUNCTIONS FOR WORKING WITH CSR MATRICES -------------------------*/
 CSRMatrix_t*  csr_matrix_create(int, int);        // create empty CSR matrix
@@ -145,7 +146,7 @@ void csr_matrix_free(CSRMatrix_t *A) {
 // Stage 0 required: 
 Manip_t* do_stage_0(int rows, int cols, CSRMatrix_t* A,
     CSRMatrix_t* B,int *stage) {
-    assert(A!=NULL & B!=NULL);
+    assert(A!=NULL && B!=NULL);
     // upper bound limit (realloc more efficient here?)
     A->vals = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
     A->ridx = (int*)malloc(INITIAL_ENTRIES*sizeof(int));
@@ -396,8 +397,15 @@ int do_stage_1(Manip_t* manip,CSRMatrix_t* A,CSRMatrix_t* B,int *stage) {
     // All Stage 1 instructions processed
     return manip->num_map; 
 }
+// Swap two values
+int swap(int *a, int *b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+    return 1;
+}
 
-// Apply a single manipulation to matrix A
+// Apply a single manipulation to initial matrix 
 void apply_manipulation(char* type, int para1, int para2, 
     int para3, int para4, CSRMatrix_t* A) {
     if (strcmp(type, "s") == 0) {
@@ -430,7 +438,7 @@ void apply_manipulation(char* type, int para1, int para2,
             int pos = start;
             while (pos < end && A->cidx[pos] < col) pos++;
             
-            // shift to make room
+            // shift to make room (1 would be right)
             shift_arr(A, pos, 1);
             // insert new element
             A->cidx[pos] = col;
@@ -444,7 +452,21 @@ void apply_manipulation(char* type, int para1, int para2,
     }
     else if (strcmp(type, "S") == 0) {
         printf("INSTRUCTION %s:%d,%d,%d,%d\n",type,para1,para2,para3,para4);
+        int row1=para1, col1=para2, row2=para3, col2=para4; 
         // Swap values for 2 cells
+        int i = A->rptr[row1], j = A->rptr[row2];
+        int found=0;
+        while (!found) {
+            if (A->cidx[i] == col1 && A->cidx[j] == col2) {
+                found = swap(&A->vals[i], &A->vals[j]);
+            }
+            if (A->cidx[i] != col1) {
+                i++;
+            }
+            if (A->cidx[j] != col2) {
+                j++;
+            }
+        }
     }
     else if (strcmp(type, "m") == 0) {
         printf("INSTRUCTION %s:%d\n", type, para1);
@@ -481,7 +503,6 @@ void apply_manipulation(char* type, int para1, int para2,
 void do_stage_2(Manip_t* manip, CSRMatrix_t* A, CSRMatrix_t* B, 
     int start_idx, int *stage) {
     for (int i = start_idx; i < manip->num_map; i++) {
-        printf("%d\n", A->nnz);
         apply_manipulation(manip[i].type, manip[i].para1, manip[i].para2, 
                          manip[i].para3, manip[i].para4, A);
         
